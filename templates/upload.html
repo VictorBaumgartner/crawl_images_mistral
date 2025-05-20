@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload URLs for Image Crawling</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h1 { text-align: center; color: #333; }
+        form { display: flex; flex-direction: column; gap: 1em; }
+        input[type="file"] { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        input[type="submit"]:hover { background-color: #0056b3; }
+        ul.flashes { list-style: none; padding: 0; margin: 1em 0; background-color: #e0f7fa; border: 1px solid #b2ebf2; border-radius: 4px; }
+        ul.flashes li { padding: 10px; color: #00796b; }
+        .info { background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 10px; border-radius: 4px; margin-top: 1em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload URLs for Image Crawling</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class="flashes">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+        {% endwith %}
+
+        <div class="info">
+            <p><strong>Instructions:</strong></p>
+            <p>1. Prepare a CSV file (e.g., <code>urls.csv</code>) with one URL per line, like this:</p>
+            <pre><code>https://www.example.com/
+https://www.another-site.org/blog/
+http://my-local-test-server:8080/</code></pre>
+            <p>2. Upload your CSV file below.</p>
+            <p>3. The application will start processing the URLs in the background. Images and analysis results (<code>analysis_results.json</code>) for each website will be saved in subfolders within the <code>./jobs/&lt;job_id&gt;/</code> directory relative to where you run this Flask app.</p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" action="/upload">
+            <label for="csv_file">Select CSV file:</label>
+            <input type="file" name="file" id="csv_file" accept=".csv">
+            <input type="submit" value="Upload and Start Crawling">
+        </form>
+    </div>
+</body>
+</html>
