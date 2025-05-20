@@ -3,9 +3,30 @@ import json
 import xml.etree.ElementTree as ET
 import requests
 from io import StringIO
-import os
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel, HttpUrl
 
-def get_sitemap_urls(url):
+app = FastAPI()
+
+class URLInfo(BaseModel):
+    """
+    Represents a URL and its last modification date.
+    """
+    url: str
+    lastmod: Optional[str]
+
+class SitemapResult(BaseModel):
+    """
+    Represents the result of processing a URL, including any sitemap URLs found
+    and the extracted URL information.
+    """
+    input_url: str
+    sitemap_urls: List[str] = []
+    results: List[URLInfo] = []
+    error: Optional[str] = None  # Add an error field
+
+def get_sitemap_urls(url: str) -> List[str]:
     """
     Retrieves sitemap URLs from a given URL. Handles both sitemap index files
     and regular sitemap files.
@@ -14,7 +35,7 @@ def get_sitemap_urls(url):
         url (str): The URL to check for sitemaps.
 
     Returns:
-        list: A list of sitemap URLs.  Returns an empty list on error
+        List[str]: A list of sitemap URLs.
     """
     sitemap_urls = []
     try:
@@ -32,21 +53,25 @@ def get_sitemap_urls(url):
         elif "<urlset" in content:
             sitemap_urls.append(url)
         else:
-            print(f"Error: {url} does not appear to be a sitemap or sitemap index.")
+            # Not a sitemap, but don't raise an exception here, return empty list
             return []
 
     except requests.exceptions.RequestException as e:
+        # Log the error and return an empty list
         print(f"Error fetching sitemap(s) from {url}: {e}")
         return []
     except ET.ParseError as e:
+        # Log the error and return an empty list
         print(f"Error parsing XML from {url}: {e}")
         return []
     except Exception as e:
+        # Log the error and return an empty list
         print(f"An unexpected error occurred while processing {url}: {e}")
         return []
     return sitemap_urls
 
-def get_lastmod_from_sitemap(sitemap_url):
+
+def get_lastmod_from_sitemap(sitemap_url: str) -> List[URLInfo]:
     """
     Retrieves URLs and their lastmod dates from a sitemap URL.
 
@@ -54,8 +79,7 @@ def get_lastmod_from_sitemap(sitemap_url):
         sitemap_url (str): The URL of the sitemap.
 
     Returns:
-        list: A list of dictionaries, where each dictionary contains 'url' and 'lastmod'.
-                Returns an empty list on error.
+        List[URLInfo]: A list of URLInfo objects.
     """
     url_lastmod_list = []
     try:
@@ -68,7 +92,7 @@ def get_lastmod_from_sitemap(sitemap_url):
             loc = url_element.find('{http://www.sitemaps.org/schemas/sitemap/0.9}loc').text
             lastmod = url_element.find('{http://www.sitemaps.org/schemas/sitemap/0.9}lastmod')
             lastmod_text = lastmod.text if lastmod is not None else None  # Handle missing lastmod
-            url_lastmod_list.append({'url': loc, 'lastmod': lastmod_text})
+            url_lastmod_list.append(URLInfo(url=loc, lastmod=lastmod_text))
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching sitemap content from {sitemap_url}: {e}")
@@ -81,72 +105,32 @@ def get_lastmod_from_sitemap(sitemap_url):
         return []
     return url_lastmod_list
 
-def process_urls_from_csv(csv_file_path, output_format="json", output_file_path="output"):
+
+@app.get("/process_url/", response_model=SitemapResult)
+async def process_url(url: HttpUrl = Query(..., description="The URL to process")):
     """
-    Processes URLs from a CSV file, retrieves sitemap data, and outputs it to a file.
+    Processes a given URL to retrieve sitemap URLs and their last modification dates.
 
     Args:
-        csv_file_path (str): Path to the CSV file containing URLs.
-        output_format (str, optional):  "json" or "csv". Defaults to "json".
-        output_file_path (str, optional): Path to the output file (without extension).
+        url (HttpUrl): The URL to process.  It uses Pydantic's HttpUrl for validation.
+
+    Returns:
+        SitemapResult: A JSON response containing the input URL, sitemap URLs,
+        and the extracted URL information with last modification dates.  Will also
+        return error information, if any.
     """
-    all_results = []
-    try:
-        with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
-            reader = csv.reader(csvfile)
-            # Skip the header row, if it exists
-            next(reader, None)
-            for row in reader:
-                if row: # Make sure the row is not empty
-                    url = row[0]  # Assuming URL is the first column
-                    print(f"Processing URL: {url}")
-                    sitemap_urls = get_sitemap_urls(url)
-                    if sitemap_urls: # Check if sitemap urls were found
-                        for sitemap_url in sitemap_urls:
-                            print(f"  Processing sitemap: {sitemap_url}")
-                            results = get_lastmod_from_sitemap(sitemap_url)
-                            all_results.extend(results)
-                    else:
-                         all_results.append({'url': url, 'lastmod': 'No sitemap found'})
+    result = SitemapResult(input_url=url) # Initialize the result object
+    sitemap_urls = get_sitemap_urls(url)
 
-    except FileNotFoundError:
-        print(f"Error: CSV file not found at {csv_file_path}")
-        return
-    except Exception as e:
-        print(f"An error occurred while reading the CSV file: {e}")
-        return
+    if not sitemap_urls:
+        result.error = "No sitemap found"
+        return result
 
-    # Output the results
-    if all_results:
-        if output_format.lower() == "json":
-            with open(f"{output_file_path}.json", 'w', encoding='utf-8') as jsonfile:
-                json.dump(all_results, jsonfile, indent=4)
-            print(f"Results written to {output_file_path}.json")
-        elif output_format.lower() == "csv":
-            with open(f"{output_file_path}.csv", 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=['url', 'lastmod'])
-                writer.writeheader()
-                writer.writerows(all_results)
-            print(f"Results written to {output_file_path}.csv")
-        else:
-            print("Error: Invalid output format. Please choose 'json' or 'csv'.")
-    else:
-        print("No results to output.")
+    result.sitemap_urls = sitemap_urls  # Store the found sitemap URLs
+    for sitemap_url in sitemap_urls:
+        print(f"  Processing sitemap: {sitemap_url}")
+        lastmod_results = get_lastmod_from_sitemap(sitemap_url)
+        result.results.extend(lastmod_results)  # Extend the list
 
-if __name__ == "__main__":
-    # Get user inputs
-    csv_file_path = input("Enter the path to the CSV file containing URLs: ")
-    output_format = input("Enter the output format (json or csv): ").lower()
-    output_file_path = input("Enter the path to the output file (without extension): ")
+    return result
 
-    # Validate user inputs
-    if not os.path.exists(csv_file_path):
-        print(f"Error: CSV file not found at {csv_file_path}")
-        exit()
-
-    if output_format not in ["json", "csv"]:
-        print("Error: Invalid output format. Please choose 'json' or 'csv'.")
-        exit()
-    
-    # Process URLs and generate output
-    process_urls_from_csv(csv_file_path, output_format, output_file_path)
