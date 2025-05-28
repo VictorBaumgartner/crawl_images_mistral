@@ -1,6 +1,5 @@
-Okay, this is a collection of scripts primarily focused on web crawling, image processing with AI (Ollama), and sitemap analysis. It's a bit complex to merge into a single cohesive `README.md` without understanding the exact intended workflow and how these pieces are *meant* to connect.
-
-However, I can give you a `README.md` that describes each script individually and then try to infer a potential overarching project.
+Okay, this is a collection of scripts primarily focused on web crawling, image processing with AI (Ollama), and sitemap analysis. 
+However, here is a `README.md` that describes each script individually and then try to infer a potential overarching project.
 
 **First, let's analyze the scripts and potential redundancy/improvements:**
 
