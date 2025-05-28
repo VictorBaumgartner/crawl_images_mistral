@@ -41,7 +41,7 @@ Given the Flask app (`app.py`) and the `crawler.py` which it uses, these form a 
 *   **Specialized Tools:**
     *   `sitemap_processor.py` (FastAPI for sitemap analysis - could be a separate microservice or utility)
     *   `playwright_img_crawler.py` (Specific logo scraper - might be a utility script)
-*   **Likely Redundant/Superseded (or for specific, isolated testing):**
+*   **Likely Redundant/Superseded (or for specific, isolated testing, now deleted):**
     *   `img_crawl.py`
     *   `retrieve_img_allsites.py`
 
